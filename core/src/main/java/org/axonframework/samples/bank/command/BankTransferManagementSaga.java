@@ -16,10 +16,18 @@
 
 package org.axonframework.samples.bank.command;
 
+import static org.axonframework.commandhandling.GenericCommandMessage.asCommandMessage;
+
+import java.time.Instant;
+
+import javax.inject.Inject;
+
 import org.axonframework.commandhandling.CommandBus;
+import org.axonframework.eventhandling.EventHandler;
 import org.axonframework.eventhandling.saga.EndSaga;
 import org.axonframework.eventhandling.saga.SagaEventHandler;
 import org.axonframework.eventhandling.saga.StartSaga;
+import org.axonframework.eventhandling.scheduling.EventScheduler;
 import org.axonframework.samples.bank.api.bankaccount.CreditDestinationBankAccountCommand;
 import org.axonframework.samples.bank.api.bankaccount.DebitSourceBankAccountCommand;
 import org.axonframework.samples.bank.api.bankaccount.DestinationBankAccountCreditedEvent;
@@ -33,18 +41,18 @@ import org.axonframework.samples.bank.api.banktransfer.MarkBankTransferCompleted
 import org.axonframework.samples.bank.api.banktransfer.MarkBankTransferFailedCommand;
 import org.axonframework.spring.stereotype.Saga;
 
-import javax.inject.Inject;
-
-import static org.axonframework.commandhandling.GenericCommandMessage.asCommandMessage;
+import lombok.Value;
 
 @Saga
 public class BankTransferManagementSaga {
 
     private transient CommandBus commandBus;
+    private transient EventScheduler eventScheduler;
 
     @Inject
-    public void setCommandBus(CommandBus commandBus) {
+    public void setCommandBus(CommandBus commandBus, EventScheduler eventScheduler) {
         this.commandBus = commandBus;
+        this.eventScheduler = eventScheduler;
     }
 
     private String sourceBankAccountId;
@@ -57,6 +65,11 @@ public class BankTransferManagementSaga {
         this.sourceBankAccountId = event.getSourceBankAccountId();
         this.destinationBankAccountId = event.getDestinationBankAccountId();
         this.amount = event.getAmount();
+        
+        eventScheduler.schedule(
+            Instant.now().plusSeconds(30),
+            new DummyScheduledEvent(event.getBankTransferId())
+        );
 
         DebitSourceBankAccountCommand command = new DebitSourceBankAccountCommand(event.getSourceBankAccountId(),
                                                                                   event.getBankTransferId(),
@@ -104,5 +117,15 @@ public class BankTransferManagementSaga {
     public void on(DestinationBankAccountCreditedEvent event) {
         MarkBankTransferCompletedCommand command = new MarkBankTransferCompletedCommand(event.getBankTransferId());
         commandBus.dispatch(asCommandMessage(command));
+    }
+    
+    @SagaEventHandler(associationProperty = "bankTransferId")
+    public void on(DummyScheduledEvent event) {
+      System.out.println("Scheduled Event " + event);
+    }
+    
+    @Value
+    class DummyScheduledEvent {
+        private String bankTransferId;
     }
 }

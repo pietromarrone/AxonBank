@@ -16,7 +16,11 @@
 
 package org.axonframework.samples.bank.config;
 
+import java.util.concurrent.Executors;
+
 import org.axonframework.eventhandling.EventBus;
+import org.axonframework.eventhandling.scheduling.EventScheduler;
+import org.axonframework.eventhandling.scheduling.java.SimpleEventScheduler;
 import org.axonframework.samples.bank.command.BankAccount;
 import org.axonframework.samples.bank.command.BankAccountCommandHandler;
 import org.axonframework.spring.config.AxonConfiguration;
@@ -35,5 +39,10 @@ public class AxonConfig {
     @Bean
     public BankAccountCommandHandler bankAccountCommandHandler() {
         return new BankAccountCommandHandler(axonConfiguration.repository(BankAccount.class), eventBus);
+    }
+    
+    @Bean
+    public EventScheduler eventScheduler(EventBus eventBus) {
+      return new SimpleEventScheduler(Executors.newScheduledThreadPool(5), eventBus);
     }
 }
